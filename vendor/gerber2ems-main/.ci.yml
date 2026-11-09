@@ -1,0 +1,3 @@
+include:
+  - gerber2ems-ci@main:.ci.yml
+  - gerber2ems-ci@main:.verification.yml

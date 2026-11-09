@@ -1,0 +1,257 @@
+"""Module containing functions for importing gerbers."""
+
+import json
+import subprocess
+import os
+import logging
+from typing import List, Optional, Tuple
+import sys
+import re
+from functools import partial
+from multiprocessing import Pool
+from pathlib import Path
+import PIL.Image
+import numpy as np
+from nanomesh import Image, Mesher2D
+import matplotlib as mpl
+
+from gerber2ems.config import Config, get_ports_from_file
+from gerber2ems.constants import (
+    GEOMETRY_DIR,
+    UNIT_MULTIPLIER,
+    BASE_UNIT,
+    STACKUP_FORMAT_VERSION,
+)
+
+logger = logging.getLogger(__name__)
+
+PIL.Image.MAX_IMAGE_PIXELS = None
+cfg = Config()
+
+
+def process_gbrs_to_pngs() -> None:
+    """Process all gerber files to PNG's.
+
+    Finds edge cuts gerber as well as copper gerbers in `fab` directory.
+    Processes copper gerbers into PNG's using edge_cuts for framing.
+    Output is saved to `ems/geometry` folder.
+
+    PATCHED (EMShrimulator Studio): renders with gerbonara + resvg_py instead of the gerbv CLI.
+    """
+    logger.info("Processing gerber files (may take a while for larger boards)")
+
+    fab = Path.cwd() / "fab"
+    edge = next(fab.glob("*Edge_Cuts.gbr"), None)
+    if edge is None:
+        logger.error("No edge_cuts gerber found")
+        sys.exit(1)
+
+    layers = list(fab.glob("*_Cu.gbr"))
+    if len(layers) == 0:
+        logger.warning("No copper gerbers found")
+
+    from EMShrimulator.core.layout.gerber_render import edge_cuts_bbox_mm, render_layer_png
+
+    bounds = edge_cuts_bbox_mm(edge)
+    for gerber_filename in layers:
+        output_filename = Path.cwd() / GEOMETRY_DIR / gerber_filename.with_suffix(".png").name.rpartition("-")[2]
+        logger.debug("Rendering %s -> %s", gerber_filename, output_filename)
+        render_layer_png(gerber_filename, bounds, output_filename, cfg.pixel_size)
+
+
+def get_dimensions(input_filename: str) -> Tuple[int, int]:
+    """Return board dimensions based on png.
+
+    Opens PNG found in `ems/geometry` directory,
+    gets it's size and subtracts border thickness to get board dimensions
+    """
+    pixel_size = cfg.pixel_size
+    path = os.path.join(GEOMETRY_DIR, input_filename)
+    image = PIL.Image.open(path)
+    image_width, image_height = image.size
+    height = image_height * pixel_size * UNIT_MULTIPLIER
+    width = image_width * pixel_size * UNIT_MULTIPLIER
+    logger.debug("Board dimensions read from file are: height:%f width:%f", height, width)
+    return (width, height)
+
+
+def get_triangles(input_filename: str) -> np.ndarray:
+    """Triangulate image.
+
+    Processes file from `ems/geometry`.
+    Converts to grayscale, thresholds it to remove border
+    and then uses Nanomesh to create a triangular mesh of the copper.
+    Returns a list of triangles, where each triangle consists of coordinates for each vertex.
+    """
+    img_path = Path(GEOMETRY_DIR) / input_filename
+    image = PIL.Image.open(img_path)
+    gray = image.convert("L")
+    if gray.getextrema()[1] < 230:  # type:ignore
+        # Image is empty - no cooper features on this layer
+        return np.empty((0, 3, 2))
+    thresh = gray.point(lambda p: 255 if p < 230 else 0)
+    cooper_np = np.array(thresh)
+    copper = Image(cooper_np)
+
+    mesher = Mesher2D(copper)
+    # These constants are set so there won't be to many triangles.
+    # If in some case triangles are too coarse they should be adjusted
+    max_edge_dist = int(60000 / (cfg.pixel_size**2 / 25))
+    mesher.generate_contour(max_edge_dist=max_edge_dist, precision=1, group_regions=False)
+    mesher.plot_contour()
+    mesh = mesher.triangulate(opts=f"epAq15a{max_edge_dist}")
+
+    points = mesh.get("triangle").points
+    cells = mesh.get("triangle").cells
+
+    # Selecting only triangles that represent copper
+    cu_triangles = []
+    for cell in cells:
+        t = (points[cell[0]], points[cell[1]], points[cell[2]])
+        center = np.average(t, axis=0)
+        is_copper = int(cooper_np[int(center[0]), int(center[1])] < 127)
+        if not is_copper:
+            continue
+        cu_triangles.append(
+            [
+                image_to_board_coordinates(t[0]),
+                image_to_board_coordinates(t[1]),
+                image_to_board_coordinates(t[2]),
+            ]
+        )
+    cu_triangles_np = np.stack(cu_triangles, axis=0)
+
+    logger.debug("Found %d triangles for %s", len(cu_triangles), input_filename)
+
+    if cfg.arguments.debug:
+        plot_mesh(img_path, image.size, cu_triangles_np)
+
+    return cu_triangles_np
+
+
+def plot_mesh(img_path: Path, img_size: Tuple[int, int], cu_triangles_np: np.ndarray) -> None:
+    """Plot cooper mesh to file."""
+    filename = img_path.with_stem(img_path.stem + "_mesh")
+    logger.debug("Saving mesh to file: %s", filename)
+    fig, ax = mpl.pyplot.subplots()
+
+    ax.set_xlim(0, image_to_board_coordinates(img_size[0]) / 1000)
+    ylim = image_to_board_coordinates(img_size[1]) / 1000
+    ax.set_ylim(0, ylim)
+    x, y = cu_triangles_np[:, :, 1].flatten() / 1000, -cu_triangles_np[:, :, 0].flatten() / 1000 + ylim
+    cu_count = cu_triangles_np.shape[0]
+    ax.set_aspect("equal")
+    ax.set_xlabel("Slice X position [mm]")
+    ax.set_ylabel("Slice Y position [mm]")
+    ax.set_title(f"{img_path.stem} triangle mesh")
+    c = np.ones(cu_count)
+    cmap = mpl.colors.ListedColormap("#B87333")
+    ax.tripcolor(x, y, c, triangles=np.arange(cu_count * 3).reshape((cu_count, 3)), edgecolor="k", lw=0.05, cmap=cmap)
+    fig.savefig(
+        filename,
+        dpi=2400,
+        bbox_inches="tight",
+    )
+    mpl.pyplot.close()
+
+
+def image_to_board_coordinates(point: np.ndarray | int) -> np.ndarray:
+    """Transform point coordinates from image to board coordinates."""
+    return point * cfg.pixel_size * UNIT_MULTIPLIER
+
+
+def get_padstack_vias() -> Optional[List[dict]]:
+    """PATCHED (EMShrimulator Studio): the app's vias from vias.json, or None to read the drill file."""
+    path = Path.cwd() / "vias.json"
+    if not path.is_file():
+        return None
+    with open(path, "r", encoding="utf-8") as file:
+        return list(json.load(file).get("vias", []))
+
+
+def get_vias() -> List[List[float]]:
+    """Get via information from the Excellon file in `fab`.
+
+    PATCHED (EMShrimulator Studio): read with gerbonara instead of regexes, so non-KiCad drill files work.
+    Returns [x, y, diameter] per via in internal 0.1 um units.
+    """
+    fab_dir = Path.cwd() / "fab"
+    from EMShrimulator.core.layout import drill as drill_reader
+    from EMShrimulator.core.layout.board import edge_cuts_file
+    from EMShrimulator.core.layout.gerber_render import edge_cuts_bbox_mm
+
+    drill_path = drill_reader.find_drill_file(fab_dir)
+    if drill_path is None:
+        logger.error("Couldn't find drill file")
+        sys.exit(1)
+
+    edge = edge_cuts_file(fab_dir)
+    bbox = edge_cuts_bbox_mm(edge) if edge is not None else None
+
+    scale = 1 / 1000 / BASE_UNIT * UNIT_MULTIPLIER  # mm -> internal units
+    vias: List[List[float]] = []
+    for hole in drill_reader.holes(drill_path, bbox):
+        if not hole.plated:
+            # A non-plated hole carries no current; it is a mounting hole.
+            continue
+        logger.debug(f"Adding via at: X{hole.x_mm:.4f}mm Y{hole.y_mm:.4f}mm d{hole.diameter_mm:.4f}mm")
+        vias.append([hole.x_mm * scale, hole.y_mm * scale, hole.diameter_mm * scale])
+
+    logger.debug("Found %d vias", len(vias))
+    return vias
+
+
+def import_stackup() -> None:
+    """Import stackup information from `fab/stackup.json` file and load it into config object."""
+    filename = "fab/stackup.json"
+    with open(filename, "r", encoding="utf-8") as file:
+        try:
+            stackup = json.load(file)
+        except json.JSONDecodeError as error:
+            logger.error(
+                "JSON decoding failed at %d:%d: %s",
+                error.lineno,
+                error.colno,
+                error.msg,
+            )
+            sys.exit(1)
+        ver = stackup["format_version"]
+        if (
+            ver is not None
+            and ver.split(".")[0] == STACKUP_FORMAT_VERSION.split(".", maxsplit=1)[0]
+            and ver.split(".")[1] >= STACKUP_FORMAT_VERSION.split(".", maxsplit=1)[1]
+        ):
+            cfg.load_stackup(stackup)
+        else:
+            logger.error(
+                "Stackup format (%s) is not supported (supported: %s)",
+                ver,
+                STACKUP_FORMAT_VERSION,
+            )
+            sys.exit()
+
+
+def import_port_positions() -> None:
+    """Import port positions from PnP .csv files.
+
+    Looks for all PnP files in `fab` folder (files ending with `-pos.csv`)
+    Parses them to find port footprints and inserts their position information to config object.
+    """
+    ports: List[Tuple[int, Tuple[float, float], float]] = []
+    for filename in (Path.cwd() / "fab").glob("*pos.csv"):
+        ports += get_ports_from_file(filename)
+
+    for number, position, direction in ports:
+        if len(cfg.ports) > number:
+            port = cfg.ports[number]
+            if port.position is None:
+                cfg.ports[number].position = position
+                cfg.ports[number].direction = direction
+            else:
+                logger.warning(
+                    "Port #%i is defined twice on the board. Ignoring the second instance",
+                    number,
+                )
+    for index, port in enumerate(cfg.ports):
+        if port.position is None:
+            logger.error("Port #%i is not defined on board. It will be skipped", index)

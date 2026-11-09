@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build output (gems.ps1 build)
+build/
+dist/
+
+# Vendored gerber2ems install leftovers
+vendor/gerber2ems.zip
+
+# Your projects and local test boards
+projects/
+testdata/
+TrialFile/
+TrialFile.zip
+
+# Private notes
+notes/
+
+# Editors, OS and tools
+.vscode/
+.idea/
+.claude/
+.cache/
+*.log
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

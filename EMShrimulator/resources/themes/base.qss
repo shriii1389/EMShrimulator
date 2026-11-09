@@ -1,0 +1,393 @@
+/* Filled from a token table in EMShrimulator/app/theme.py with string.Template. */
+
+QWidget {
+    font-size: 9pt;
+}
+
+QMainWindow, QDialog {
+    background: $bg;
+}
+
+QDockWidget {
+    color: $text_dim;
+    titlebar-close-icon: none;
+}
+QDockWidget::title {
+    background: $panel;
+    padding: 5px 8px;
+    border-bottom: 1px solid $line;
+    text-align: left;
+}
+
+QToolBar {
+    background: $panel;
+    border: none;
+    border-bottom: 1px solid $line;
+    spacing: 2px;
+    padding: 3px;
+}
+QToolBar::separator {
+    background: $line;
+    width: 1px;
+    margin: 4px 6px;
+}
+QToolButton {
+    color: $text;
+    padding: 4px 7px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+}
+QToolButton:hover {
+    background: $raised;
+    border-color: $line;
+}
+QToolButton:checked {
+    background: $accent_bg;
+    border-color: $accent;
+}
+QToolButton:disabled {
+    color: $text_faint;
+}
+
+QPushButton {
+    background: $raised;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 4px;
+    padding: 4px 11px;
+}
+QPushButton:hover {
+    border-color: $line_strong;
+}
+QPushButton:pressed, QPushButton:checked {
+    background: $accent_bg;
+    border-color: $accent;
+}
+QPushButton:disabled {
+    color: $text_faint;
+    border-color: $line;
+}
+QPushButton[role="primary"] {
+    background: $primary;
+    color: #ffffff;
+    border-color: $primary;
+    font-weight: 600;
+}
+QPushButton[role="danger"] {
+    color: $danger;
+}
+QPushButton[role="flat"] {
+    background: transparent;
+    border-color: transparent;
+    padding: 2px 6px;
+}
+QPushButton[role="flat"]:hover {
+    background: $raised;
+}
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QPlainTextEdit, QTextEdit {
+    background: $sunken;
+    color: $text;
+    border: 1px solid $line;
+    border-radius: 3px;
+    padding: 2px 5px;
+    selection-background-color: $accent;
+}
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QPlainTextEdit:focus {
+    border-color: $accent;
+}
+QLineEdit[formula="true"] {
+    color: $formula;
+    font-family: "Consolas", "Cascadia Mono", monospace;
+}
+QLineEdit[invalid="true"] {
+    border-color: $danger;
+    background: $danger_bg;
+}
+QLabel[role="note"] {
+    color: $text_faint;
+    font-size: 8pt;
+}
+QLabel[role="note-error"] {
+    color: $danger;
+    font-size: 8pt;
+}
+QLabel[role="hint"] {
+    color: $text_dim;
+}
+QLabel[role="heading"] {
+    color: $text_dim;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+QLabel[role="value"] {
+    color: $text;
+    font-weight: 600;
+    font-size: 11pt;
+}
+QLabel[role="error"] {
+    color: $danger;
+}
+QLabel[role="display"] {
+    color: $text;
+    font-size: 26pt;
+    font-weight: 600;
+}
+QLabel[role="lede"] {
+    color: $text;
+    font-size: 12pt;
+}
+QFrame[role="rule"] {
+    background: $primary;
+    border: none;
+}
+
+QTreeView, QListView, QTableView, QTableWidget, QTreeWidget, QListWidget {
+    background: $panel;
+    alternate-background-color: $bg;
+    color: $text;
+    border: 1px solid $line;
+    selection-background-color: $accent_bg;
+    selection-color: $text;
+    outline: none;
+}
+QTreeView::item, QListView::item {
+    padding: 3px 2px;
+}
+QTreeView::item:selected, QListView::item:selected, QTableView::item:selected {
+    background: $accent_bg;
+    color: $text;
+}
+QListView[role="recent"] {
+    background: transparent;
+    border: none;
+}
+QListView[role="recent"] QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 0;
+}
+QListView[role="recent"] QScrollBar::handle:vertical {
+    background: $line;
+    border-radius: 4px;
+    min-height: 32px;
+}
+QListView[role="recent"] QScrollBar::handle:vertical:hover {
+    background: $line_strong;
+}
+QListView[role="recent"] QScrollBar::add-line:vertical, QListView[role="recent"] QScrollBar::sub-line:vertical {
+    height: 0;
+}
+QListView[role="recent"] QScrollBar::add-page:vertical, QListView[role="recent"] QScrollBar::sub-page:vertical {
+    background: transparent;
+}
+QHeaderView::section {
+    background: $raised;
+    color: $text_dim;
+    border: none;
+    border-right: 1px solid $line;
+    border-bottom: 1px solid $line;
+    padding: 4px 6px;
+}
+
+QTabWidget::pane {
+    border: 1px solid $line;
+    top: -1px;
+}
+QTabBar::tab {
+    background: $panel;
+    color: $text_dim;
+    padding: 5px 12px;
+    border: 1px solid $line;
+    border-bottom: none;
+    margin-right: 1px;
+}
+QTabBar::tab:selected {
+    background: $bg;
+    color: $text;
+    border-top: 2px solid $accent;
+}
+
+QScrollArea {
+    border: none;
+    background: transparent;
+}
+QScrollArea > QWidget > QWidget {
+    background: transparent;
+}
+
+QGroupBox {
+    border: 1px solid $line;
+    border-radius: 4px;
+    margin-top: 12px;
+    padding-top: 6px;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    left: 8px;
+    color: $text_dim;
+}
+
+QProgressBar {
+    background: $sunken;
+    border: 1px solid $line;
+    border-radius: 3px;
+    height: 10px;
+    text-align: center;
+    color: $text_dim;
+}
+QProgressBar::chunk {
+    background: $accent;
+    border-radius: 2px;
+}
+
+QStatusBar {
+    background: $panel;
+    color: $text_dim;
+    border-top: 1px solid $line;
+}
+QStatusBar QLabel {
+    padding: 0 8px;
+}
+
+QMenu {
+    background: $raised;
+    color: $text;
+    border: 1px solid $line_strong;
+}
+QMenu::item:selected {
+    background: $accent_bg;
+}
+QMenu::item:disabled {
+    color: $text_faint;
+}
+QMenuBar {
+    background: $panel;
+    color: $text;
+}
+QMenuBar::item:selected {
+    background: $raised;
+}
+
+QToolTip {
+    background: $raised;
+    color: $text;
+    border: 1px solid $line_strong;
+    padding: 4px;
+}
+
+QFrame[role="card"] {
+    background: $panel;
+    border: 1px solid $line;
+    border-radius: 5px;
+}
+QFrame[role="toast"] {
+    background: $raised;
+    border: 1px solid $line_strong;
+    border-radius: 6px;
+}
+QFrame[role="toast-error"] {
+    background: $danger_bg;
+    border: 1px solid $danger;
+    border-radius: 6px;
+}
+QToolButton[role="section"], QToolButton[role="section"]:checked, QToolButton[role="section"]:hover {
+    background: transparent;
+    color: $text_dim;
+    font-weight: 600;
+    border: none;
+    border-bottom: 1px solid $line;
+    border-radius: 0;
+    padding: 5px 4px;
+    text-align: left;
+}
+QToolButton[role="section"]:hover {
+    color: $text;
+}
+QDockWidget > QWidget {
+    min-width: 240px;
+}
+QPlainTextEdit[role="log"] {
+    font-family: "Consolas", "Cascadia Mono", monospace;
+    font-size: 8.5pt;
+    background: $sunken;
+}
+
+/* --- workspaces: project tree, pages, inspector --- */
+QWidget#project-side {
+    background: $panel;
+}
+QTreeWidget#project-tree {
+    background: $panel;
+    border: none;
+    border-top: 1px solid $line;
+    padding: 2px 0;
+}
+QTreeWidget#project-tree::item {
+    padding: 3px 2px;
+}
+QTreeWidget#project-tree::item:hover {
+    background: $raised;
+}
+QWidget#inspector {
+    background: $panel;
+}
+QSplitter::handle {
+    background: $line;
+}
+QSplitter::handle:horizontal {
+    width: 1px;
+}
+QSplitter::handle:vertical {
+    height: 1px;
+}
+QFrame[role="page-header"] {
+    background: $panel;
+    border: none;
+    border-bottom: 1px solid $line;
+}
+QLabel[role="page-title"] {
+    color: $text;
+    font-size: 12pt;
+    font-weight: 600;
+}
+QLabel[role="card-title"] {
+    color: $text;
+    font-size: 10.5pt;
+    font-weight: 600;
+}
+QLabel[role="subheading"] {
+    color: $text_dim;
+    font-weight: 600;
+    padding-top: 6px;
+}
+QScrollArea#setup-page {
+    background: $bg;
+}
+QWidget#plot-controls {
+    background: $panel;
+    border-right: 1px solid $line;
+}
+QListWidget#trace-list {
+    background: $sunken;
+}
+QToolButton[popupMode="2"] {
+    padding-right: 18px;
+}
+QToolButton::menu-indicator {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    right: 5px;
+}
+QToolBar QToolButton[role="run"] {
+    background: $primary;
+    color: #ffffff;
+    border-color: $primary;
+    font-weight: 600;
+    padding: 4px 12px;
+}
+QToolBar QToolButton[role="run"]:disabled {
+    background: $raised;
+    color: $text_faint;
+    border-color: $line;
+}
