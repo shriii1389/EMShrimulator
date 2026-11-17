@@ -12,10 +12,15 @@ from EMShrimulator.config import (
     APP_VERSION,
     FROZEN,
     GERBER2EMS_DIR,
+    IS_WINDOWS,
+    OPENEMS_BINARY,
     OPENEMS_DIR,
     OPENEMS_EXE,
+    openems_library_dirs,
     projects_dir,
 )
+
+SETUP_HINT = r"Re-run .\gems.ps1 setup" if IS_WINDOWS else "Re-run ./gems.sh setup"
 from EMShrimulator.core import jobs, workers
 
 
@@ -39,39 +44,49 @@ def diagnostics() -> Dict:
     checks.append(check(
         "openEMS install directory", OPENEMS_DIR.is_dir(), str(OPENEMS_DIR),
         "Set the OPENEMS_DIR environment variable to your openEMS install, or reinstall openEMS. "
-        "The compiled CSXCAD/openEMS wheels load their DLLs from this directory.",
+        + ("The compiled CSXCAD/openEMS wheels load their DLLs from this directory." if IS_WINDOWS else
+           "./gems.sh setup builds openEMS into ~/opt/openEMS (override with OPENEMS_DIR)."),
     ))
     checks.append(check(
-        "openEMS.exe", OPENEMS_EXE.is_file(), str(OPENEMS_EXE),
-        "The native solver binary is missing from the openEMS directory.",
+        OPENEMS_BINARY, OPENEMS_EXE.is_file(), str(OPENEMS_EXE),
+        "The native solver binary is missing from the openEMS directory."
+        + ("" if IS_WINDOWS else " Run ./gems.sh setup to build it."),
     ))
 
     launcher = Path(workers.command("run")[0])
     checks.append(check(
         "run launcher", launcher.is_file(), str(launcher),
         "Runs are started as separate processes through this executable. "
-        + ("Reinstall the application." if FROZEN else "Re-run .\\gems.ps1 setup to rebuild the venv."),
+        + ("Reinstall the application." if FROZEN else f"{SETUP_HINT} to rebuild the venv."),
     ))
 
     # Needs EMShrimulator.bootstrap first.
     try:
         import EMShrimulator.bootstrap  # noqa: F401
-        dll_ok, dll_detail = True, f"os.add_dll_directory({OPENEMS_DIR})"
+        if IS_WINDOWS:
+            dll_ok, dll_detail = True, f"os.add_dll_directory({OPENEMS_DIR})"
+        else:
+            libs = openems_library_dirs(OPENEMS_DIR)
+            dll_ok = any(any(d.glob("libCSXCAD.so*")) for d in libs)
+            dll_detail = ", ".join(str(d) for d in libs) or f"no lib/ or lib64/ under {OPENEMS_DIR}"
     except Exception as exc:  # noqa: BLE001
         dll_ok, dll_detail = False, str(exc)
-    checks.append(check("DLL search path", dll_ok, dll_detail,
+    checks.append(check("shared library path" if not IS_WINDOWS else "DLL search path", dll_ok, dll_detail,
                         "Python 3.8+ on Windows ignores PATH for extension-module DLLs; "
-                        "EMShrimulator/bootstrap.py registers the openEMS directory instead."))
+                        "EMShrimulator/bootstrap.py registers the openEMS directory instead." if IS_WINDOWS else
+                        "libCSXCAD.so was not found under the openEMS directory. Run ./gems.sh setup."))
 
     checks.append(module_check("CSXCAD", "CSXCAD bindings",
-                               "pip install the csxcad wheel matching this Python's ABI (cp313)."))
+                               "pip install the csxcad wheel matching this Python's ABI (cp313)." if IS_WINDOWS
+                               else f"{SETUP_HINT} (builds the CSXCAD bindings into the venv)."))
     checks.append(module_check("openEMS", "openEMS bindings",
-                               "pip install the openems wheel matching this Python's ABI (cp313)."))
+                               "pip install the openems wheel matching this Python's ABI (cp313)." if IS_WINDOWS
+                               else f"{SETUP_HINT} (builds the openEMS bindings into the venv)."))
     checks.append(module_check("manifold3d", "CSG kernel (manifold3d)",
                                "pip install manifold3d - needed for union/intersect/subtract objects."))
     checks.append(module_check("gerbonara", "Gerber parser (gerbonara)", "pip install gerbonara"))
     checks.append(module_check("resvg_py", "Rasterizer (resvg-py)",
-                               "pip install resvg-py - replaces the gerbv dependency on Windows."))
+                               "pip install resvg-py - replaces the gerbv dependency."))
     checks.append(module_check("skrf", "scikit-rf (Touchstone)", "pip install scikit-rf"))
     checks.append(module_check("nanomesh", "nanomesh (copper meshing)", "pip install nanomesh"))
     checks.append(module_check("h5py", "h5py (far-field data)", "pip install h5py"))
@@ -82,7 +97,7 @@ def diagnostics() -> Dict:
     except Exception as exc:  # noqa: BLE001
         g2e_ok, g2e_detail = False, str(exc)
     checks.append(check("gerber2ems (vendored)", g2e_ok, g2e_detail,
-                        "pip install -e vendor\\gerber2ems-main --no-deps "
+                        "pip install -e vendor/gerber2ems-main --no-deps "
                         "(with SETUPTOOLS_SCM_PRETEND_VERSION set)"))
 
     try:

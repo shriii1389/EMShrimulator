@@ -1,6 +1,7 @@
 """Application start-up. Heavy imports happen after the splash is shown."""
 from __future__ import annotations
 
+import os
 import sys
 import traceback
 from typing import Dict, List, Optional
@@ -20,10 +21,11 @@ def _splash(c: Dict[str, str]) -> QSplashScreen:
     painter.setRenderHint(QPainter.Antialiasing)
     QSvgRenderer(str(APP_ICON)).render(painter, QRectF(24, 46, 112, 112))
     painter.setPen(QColor(c["accent"]))
-    painter.setFont(QFont("Segoe UI", 22, QFont.Bold))
+    family = QApplication.font().family()  # Segoe UI on Windows, the desktop font elsewhere
+    painter.setFont(QFont(family, 22, QFont.Bold))
     painter.drawText(156, 92, APP_NAME)
     painter.setPen(QColor(c["text_dim"]))
-    painter.setFont(QFont("Segoe UI", 10))
+    painter.setFont(QFont(family, 10))
     painter.drawText(158, 124, f"Version {APP_VERSION} · EM simulation over openEMS")
     painter.fillRect(158, 138, 64, 3, QColor(c["primary"]))
     painter.end()
@@ -63,6 +65,13 @@ def run(argv: Optional[List[str]] = None) -> int:
         import ctypes
 
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(f"{ORGANISATION}.Studio")
+    elif sys.platform.startswith("linux"):
+        # VTK's render window draws into a native X11 window; on a Wayland session Qt's wayland
+        # plugin leaves the 3D viewport blank or crashes, so run through XWayland unless told otherwise.
+        if os.environ.get("WAYLAND_DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
+            os.environ["QT_QPA_PLATFORM"] = "xcb"
+        # Matches the .desktop file `gems.sh install-desktop` writes, so the dock shows the icon.
+        QApplication.setDesktopFileName("emshrimulator-studio")
     app = QApplication(argv)
     app.setWindowIcon(QIcon(str(APP_ICON)))
 

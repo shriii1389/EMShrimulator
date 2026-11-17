@@ -1,13 +1,12 @@
 """Results panel for both design types, loaded from the Touchstone on a worker thread."""
 from __future__ import annotations
 
-import os
 import shutil
 from pathlib import Path
 from typing import Callable, Dict, Optional
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QSize, Qt, QUrl, Signal
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QFileDialog,
@@ -136,8 +135,8 @@ class ResultsView(QWidget):
         self.plots.setIconSize(QSize(360, 260))
         self.plots.setResizeMode(QListView.Adjust)
         self.plots.setSpacing(8)
-        self.plots.itemDoubleClicked.connect(lambda item: os.startfile(item.data(Qt.UserRole))
-                                             if hasattr(os, "startfile") else None)
+        self.plots.itemDoubleClicked.connect(
+            lambda item: QDesktopServices.openUrl(QUrl.fromLocalFile(str(item.data(Qt.UserRole)))))
 
         self.message = QLabel("Loading results…")
         self.message.setProperty("role", "hint")

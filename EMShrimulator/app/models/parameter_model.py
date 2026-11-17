@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import Any
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt, Signal
-from PySide6.QtGui import QColor, QFont
+from PySide6.QtGui import QColor, QFont, QFontDatabase
 
 from EMShrimulator.app import commands as cmd
 from EMShrimulator.app import theme
@@ -31,7 +31,7 @@ class ParameterTableModel(QAbstractTableModel):
     def __init__(self, session, parent=None):
         super().__init__(parent)
         self.session = session
-        self._mono = QFont("Consolas")
+        self._mono = QFontDatabase.systemFont(QFontDatabase.FixedFont)
         self._mono.setStyleHint(QFont.Monospace)
         self._params, self._rows, self._danger, self._dim = self._build()
         theme.manager().changed.connect(self._theme_changed)

@@ -1,4 +1,4 @@
-"""Solver subprocess launch: `python -m` from source, gems-worker.exe when frozen."""
+"""Solver subprocess launch: `python -m` from source, gems-worker(.exe) when frozen."""
 from __future__ import annotations
 
 import importlib
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
-from EMShrimulator.config import FROZEN, OPENEMS_DIR, REPO_ROOT
+from EMShrimulator.config import FROZEN, OPENEMS_DIR, OPENEMS_EXE, REPO_ROOT, openems_library_dirs
 
 WORKERS: Dict[str, str] = {
     "run": "EMShrimulator.core.em.run_worker",
@@ -45,6 +45,14 @@ def environment() -> Dict[str, str]:
         env["PYTHONPATH"] = str(REPO_ROOT) + os.pathsep + env.get("PYTHONPATH", "")
     env["OPENEMS_DIR"] = str(OPENEMS_DIR)
     env["OPENEMS_INSTALL_PATH"] = str(OPENEMS_DIR)  # read by CSXCAD to find its DLLs
+    if sys.platform != "win32":
+        # The loader reads this at process start, so the child gets it from here.
+        libs = [str(d) for d in openems_library_dirs(OPENEMS_DIR)]
+        existing = env.get("LD_LIBRARY_PATH", "")
+        env["LD_LIBRARY_PATH"] = os.pathsep.join(libs + ([existing] if existing else []))
+        bindir = OPENEMS_EXE.parent
+        if bindir.is_dir():
+            env["PATH"] = str(bindir) + os.pathsep + env.get("PATH", "")
     env["PYTHONUNBUFFERED"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     env["MPLBACKEND"] = "Agg"  # the Qt backend crashes headless workers

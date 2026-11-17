@@ -5,6 +5,9 @@ Plain VTK, with the same render settings as the 3D view (FXAA, no MSAA).
 from __future__ import annotations
 
 import os
+import shutil
+import subprocess
+from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
@@ -31,12 +34,29 @@ OVERLAY_OPACITY = 0.6
 # A system font with θ and φ; VTK's built-in one has no Greek.
 FONT_FILES = (Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "segoeui.ttf",
               Path(os.environ.get("WINDIR", r"C:\Windows")) / "Fonts" / "arial.ttf",
+              # Fedora
+              Path("/usr/share/fonts/google-noto/NotoSans-Regular.ttf"),
+              Path("/usr/share/fonts/google-noto-vf/NotoSans[wght].ttf"),
+              Path("/usr/share/fonts/dejavu-sans-fonts/DejaVuSans.ttf"),
+              Path("/usr/share/fonts/liberation-sans-fonts/LiberationSans-Regular.ttf"),
+              Path("/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf"),
+              # Debian/Ubuntu, macOS
               Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"), Path("/Library/Fonts/Arial Unicode.ttf"))
 VTK_FONT_FILE = 4  # vtkTextProperty's font family that reads a font file
 
 
+@lru_cache(maxsize=1)
 def _font_file() -> Optional[str]:
-    return next((str(p) for p in FONT_FILES if p.exists()), None)
+    found = next((str(p) for p in FONT_FILES if p.exists()), None)
+    if found or not shutil.which("fc-match"):
+        return found
+    # Ask fontconfig for any sans font that has θ (U+03B8) and φ (U+03C6).
+    try:
+        out = subprocess.run(["fc-match", "-f", "%{file}", "sans-serif:charset=3b8 3c6"],
+                             capture_output=True, text=True, timeout=5).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return out if out.lower().endswith((".ttf", ".otf")) and Path(out).is_file() else None
 
 
 def surface(theta_deg: np.ndarray, phi_deg: np.ndarray, rn: np.ndarray, shape: str) -> np.ndarray:

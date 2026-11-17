@@ -1,6 +1,6 @@
 # EMShrimulator Studio
 
-A Windows desktop app for [openEMS](https://openems.de), so you can run EM
+A desktop app for [openEMS](https://openems.de) on Fedora Linux and Windows, so you can run EM
 simulations without writing scripts.
 
 openEMS is a really good free FDTD solver, but you drive it from Python or
@@ -62,7 +62,40 @@ There are four themes under **View › Theme**, including a dark one.
 
 There's no prebuilt download yet, so for now you run it from source.
 
-### From source
+### Fedora (and other Linux)
+
+From the repo folder:
+
+```bash
+./gems.sh setup     # dnf packages, builds openEMS, makes .venv and installs everything
+./gems.sh doctor    # checks the install and tells you what's missing
+./gems.sh           # starts the app
+./gems.sh desktop   # optional: adds EMShrimulator Studio to the app menu
+```
+
+openEMS isn't packaged for Fedora, so `setup` compiles it from source:
+
+- It installs the build tools and libraries with `sudo dnf install`, so it asks
+  for your password once. These are gcc, cmake, boost, tinyxml, hdf5, CGAL,
+  VTK and `python3.13`. Set `GEMS_SKIP_DNF=1` to skip this step and install
+  them yourself.
+- It clones [openEMS-Project](https://github.com/thliebig/openEMS-Project)
+  `v0.37.0` into `.cache/`, builds fparser, CSXCAD and openEMS without the
+  AppCSXCAD GUI, and installs them into `~/opt/openEMS`. This takes 10–30
+  minutes. Set `OPENEMS_DIR` to use a different prefix or an openEMS you
+  already built, and `GEMS_OPENEMS_REF` to build a different tag.
+- It compiles the CSXCAD and openEMS Python bindings against the venv's
+  Python. The venv uses Python 3.13; set `GEMS_PYTHON` to use another one.
+
+`./gems.sh openems` rebuilds just openEMS and its bindings, and
+`./gems.sh setup --force` recreates the venv from scratch. A `.venv` left over
+from Windows is replaced automatically.
+
+On a Wayland desktop the app runs through XWayland (`QT_QPA_PLATFORM=xcb`),
+because VTK's 3D viewport needs an X11 window. To override that, set
+`QT_QPA_PLATFORM` yourself.
+
+### Windows
 
 You need:
 
@@ -70,9 +103,9 @@ You need:
   wheels are only built for 3.13.
 - **openEMS for Windows** from the
   [openEMS-Project releases](https://github.com/thliebig/openEMS-Project/releases).
-  Get a build with `cp313` wheels in its `python` folder. I've been using
-  openEMS 0.0.36 with CSXCAD 0.6.3. Unzip it to `C:\OpenEMS\openEMS`, or set
-  `OPENEMS_DIR` to whatever folder has `openEMS.exe` in it.
+  Get a build with `cp313` wheels in its `python` folder. Unzip it to
+  `C:\OpenEMS\openEMS`, or set `OPENEMS_DIR` to whatever folder has
+  `openEMS.exe` in it.
 
 Then in PowerShell, from the repo folder:
 
@@ -82,11 +115,13 @@ Then in PowerShell, from the repo folder:
 .\gems.ps1          # starts the app
 ```
 
-You can also just double-click `EMShrimulator Studio.bat`. When you run from
-source, projects go in `projects\` inside the repo.
+You can also double-click `EMShrimulator Studio.bat`.
 
-`.\gems.ps1 test` runs the tests and `.\gems.ps1 build` makes the standalone
-zip in `dist\`.
+### Either way
+
+When you run from source, projects go in `projects/` inside the repo.
+`./gems.sh test` (or `.\gems.ps1 test`) runs the tests, and `build` makes the
+standalone bundle in `dist/`: a `.tar.gz` on Linux, a `.zip` on Windows.
 
 ## First run
 
@@ -104,7 +139,8 @@ zip in `dist\`.
 
 ## Good to know
 
-- It's Windows only for now.
+- It runs on Fedora and Windows. Other Linux distributions should work if you
+  install the equivalent packages and run `GEMS_SKIP_DNF=1 ./gems.sh setup`.
 - FDTD is hungry. A big board or a fine mesh eats memory, disk and time.
 - It's a simulator. The answer is only as good as the mesh, boundaries,
   materials and ports you give it, so sanity-check results before you trust

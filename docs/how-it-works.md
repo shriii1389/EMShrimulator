@@ -16,13 +16,13 @@ EMShrimulator/
 
 The one rule: `app` imports `core`, never the other way round. There's no
 PySide6 import anywhere under `core/`. That's what lets the solver run in its
-own process without loading Qt, and why the packaged `gems-worker.exe` is
+own process without loading Qt, and why the packaged `gems-worker` is
 built without it.
 
 ## Projects
 
-A project is a folder under `projects\` (or `Documents\EMShrimulator Projects`
-in the Windows build):
+A project is a folder under `projects/` (or `~/Documents/EMShrimulator Projects`
+in the packaged build):
 
 ```
 <project>/

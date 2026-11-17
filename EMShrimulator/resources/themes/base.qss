@@ -98,7 +98,7 @@ QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QPlainTe
 }
 QLineEdit[formula="true"] {
     color: $formula;
-    font-family: "Consolas", "Cascadia Mono", monospace;
+    font-family: "Consolas", "Cascadia Mono", "DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", monospace;
 }
 QLineEdit[invalid="true"] {
     border-color: $danger;
@@ -308,7 +308,7 @@ QDockWidget > QWidget {
     min-width: 240px;
 }
 QPlainTextEdit[role="log"] {
-    font-family: "Consolas", "Cascadia Mono", monospace;
+    font-family: "Consolas", "Cascadia Mono", "DejaVu Sans Mono", "Noto Sans Mono", "Liberation Mono", monospace;
     font-size: 8.5pt;
     background: $sunken;
 }

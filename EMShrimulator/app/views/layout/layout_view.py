@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtGui import QAction, QActionGroup, QFont, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QFontDatabase, QKeySequence
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -1048,7 +1048,7 @@ class LayoutView(Workspace):
         dialog.resize(640, 560)
         text = QPlainTextEdit(json.dumps(data, indent=2))
         text.setReadOnly(True)
-        text.setFont(QFont("Consolas"))
+        text.setFont(QFontDatabase.systemFont(QFontDatabase.FixedFont))
         info = QLabel("Written into the project directory on every run. This is gerber2ems's own config format — "
                       "nothing is hidden between this file and the solver.")
         info.setWordWrap(True)

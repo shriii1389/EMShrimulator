@@ -48,7 +48,10 @@ def extract(archive: Path, dest: Path) -> Path:
     else:
         raise ODBError(f"{archive.name} is not a directory, zip or tar archive")
 
-    matrix = next((p for p in root.rglob("matrix") if p.is_file() and p.parent.name.lower() == "matrix"), None)
+    # Case-insensitive like the rest of this module: some exporters write MATRIX/MATRIX, and
+    # Linux filesystems (unlike Windows) would otherwise miss it.
+    matrix = next((p for p in root.rglob("matrix", case_sensitive=False)
+                   if p.is_file() and p.parent.name.lower() == "matrix"), None)
     if matrix is None:
         raise ODBError("no matrix/matrix file found — this does not look like an ODB++ product model")
     return matrix.parent.parent

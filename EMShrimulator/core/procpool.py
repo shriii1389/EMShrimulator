@@ -4,6 +4,7 @@ Submitted functions must be module-level with picklable arguments. If the pool b
 """
 from __future__ import annotations
 
+import multiprocessing
 import os
 import threading
 from concurrent.futures import Future, ProcessPoolExecutor
@@ -32,7 +33,8 @@ def _executor() -> Optional[ProcessPoolExecutor]:
     with _lock:
         if _pool is None and not _disabled:
             try:
-                _pool = ProcessPoolExecutor(max_workers=workers())
+                # spawn everywhere: forking the multi-threaded Qt process (Linux's default) can deadlock.
+                _pool = ProcessPoolExecutor(max_workers=workers(), mp_context=multiprocessing.get_context("spawn"))
             except Exception:  # noqa: BLE001 - no processes available: run inline from now on
                 _disabled = True
         return _pool
