@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 import platform
+import shutil
+import subprocess
 import sys
 from importlib import import_module
 from pathlib import Path
@@ -38,6 +40,27 @@ def module_check(module: str, label: str, fix: str) -> Dict:
         return check(label, False, str(exc), fix)
 
 
+def missing_shared_libraries(binary: Path) -> List[str]:
+    """Libraries `binary` links against that the Linux loader cannot find.
+
+    A distro upgrade that bumps a soname (Fedora's HDF5 1.14 -> 2.x renamed libhdf5.so.310 to .320)
+    leaves a source-built openEMS present on disk but unable to start.
+    """
+    ldd = shutil.which("ldd")
+    if IS_WINDOWS or not ldd or not binary.is_file():
+        return []
+    env = dict(os.environ)
+    search = [str(d) for d in openems_library_dirs(OPENEMS_DIR)]
+    if env.get("LD_LIBRARY_PATH"):
+        search.append(env["LD_LIBRARY_PATH"])
+    env["LD_LIBRARY_PATH"] = os.pathsep.join(search)
+    try:
+        out = subprocess.run([ldd, str(binary)], capture_output=True, text=True, env=env, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted({line.split()[0] for line in out.splitlines() if "not found" in line})
+
+
 def diagnostics() -> Dict:
     checks: List[Dict] = []
 
@@ -52,6 +75,14 @@ def diagnostics() -> Dict:
         "The native solver binary is missing from the openEMS directory."
         + ("" if IS_WINDOWS else " Run ./gems.sh setup to build it."),
     ))
+    if not IS_WINDOWS and OPENEMS_EXE.is_file():
+        missing = missing_shared_libraries(OPENEMS_EXE)
+        checks.append(check(
+            "openEMS shared libraries", not missing,
+            "all found" if not missing else "not found: " + ", ".join(missing),
+            "openEMS was built against system libraries that are no longer installed (a system "
+            "upgrade replaced them). Run ./gems.sh setup to rebuild openEMS and its bindings.",
+        ))
 
     launcher = Path(workers.command("run")[0])
     checks.append(check(

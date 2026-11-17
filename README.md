@@ -91,6 +91,12 @@ openEMS isn't packaged for Fedora, so `setup` compiles it from source:
 `./gems.sh setup --force` recreates the venv from scratch. A `.venv` left over
 from Windows is replaced automatically.
 
+After a Fedora upgrade, openEMS can stop loading with an error like
+`libhdf5.so.310: cannot open shared object file`. The upgrade replaced a
+library it was built against (Fedora 45 moved HDF5 from 1.14 to 2.x).
+`./gems.sh doctor` reports this, and `./gems.sh setup` notices it and rebuilds
+openEMS and its bindings against the new libraries.
+
 On a Wayland desktop the app runs through XWayland (`QT_QPA_PLATFORM=xcb`),
 because VTK's 3D viewport needs an X11 window. To override that, set
 `QT_QPA_PLATFORM` yourself.

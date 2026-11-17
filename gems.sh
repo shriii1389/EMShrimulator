@@ -64,6 +64,19 @@ openems_installed() {
     [[ -x "$OPENEMS_DIR/bin/openEMS" ]] && compgen -G "$OPENEMS_DIR/lib*/libCSXCAD.so*" >/dev/null
 }
 
+# Shared libraries the installed openEMS links against but the loader can no longer find. Fedora
+# upgrades bump sonames under it (HDF5 1.14 -> 2.x turned libhdf5.so.310 into .320), and then the
+# solver and the Python bindings fail to load until openEMS is rebuilt.
+openems_missing_libs() {
+    local libs f
+    libs="$(openems_lib_dirs)"
+    for f in "$OPENEMS_DIR/bin/openEMS" "$OPENEMS_DIR"/lib*/lib{CSXCAD,openEMS,nf2ff}.so.*; do
+        [[ -f "$f" && ! -L "$f" ]] || continue
+        LD_LIBRARY_PATH="$libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ldd "$f" 2>/dev/null |
+            awk '/not found/ {print $1}'
+    done | sort -u | tr '\n' ' '
+}
+
 use_environment() {
     export OPENEMS_DIR
     export OPENEMS_INSTALL_PATH="$OPENEMS_DIR"
@@ -151,6 +164,10 @@ set(CMAKE_INSTALL_RPATH "$OPENEMS_DIR/lib64;$OPENEMS_DIR/lib" CACHE STRING "" FO
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH ON CACHE BOOL "" FORCE)
 EOF
     step "Building openEMS $OPENEMS_REF into $OPENEMS_DIR with $JOBS jobs (10-30 minutes)"
+    # Always start clean: the CMake cache pins the library versions found last time (HDF5 1.14.6,
+    # say) and the superbuild's stamps would skip the sub-builds, so a rebuild after a system
+    # upgrade would reinstall binaries linked against libraries that no longer exist.
+    rm -rf "$build"
     mkdir -p "$OPENEMS_DIR" "$build"
     local log="$build/gems-build.log"
     echo "     full log: $log"
@@ -162,6 +179,8 @@ EOF
         CMAKE_BUILD_PARALLEL_LEVEL="$JOBS" cmake --build "$build" -j "$JOBS"
     } >"$log" 2>&1 || { tail -n 40 "$log" >&2; die "Building openEMS failed - see $log"; }
     openems_installed || die "The build finished but $OPENEMS_DIR/bin/openEMS or libCSXCAD.so is missing."
+    local missing; missing="$(openems_missing_libs)"
+    [[ -z "$missing" ]] || die "openEMS was built but cannot find these libraries: $missing"
     ok "openEMS installed at $OPENEMS_DIR"
 }
 
@@ -169,6 +188,9 @@ install_openems_bindings() {
     fetch_openems_source
     step "Building the CSXCAD and openEMS Python bindings into the venv"
     local libs; libs="$(openems_lib_dirs)"
+    # pip builds these in-tree, and setuptools skips extensions whose .so in build/ looks up to date,
+    # which would reinstall modules linked against the previous openEMS build.
+    rm -rf "$OPENEMS_SRC/CSXCAD/python/build" "$OPENEMS_SRC/openEMS/python/build"
     CSXCAD_INSTALL_PATH="$OPENEMS_DIR" OPENEMS_INSTALL_PATH="$OPENEMS_DIR" \
     LD_LIBRARY_PATH="$libs${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
         "$VENV_PY" -m pip install --quiet "$OPENEMS_SRC/CSXCAD/python" \
@@ -213,12 +235,23 @@ cmd_setup() {
     "$VENV_PY" -m pip install --quiet -r "$ROOT/requirements.txt" || die "Installing the Python dependencies failed."
     ok "Python dependencies installed"
 
+    local rebuilt=0 missing=""
     if openems_installed && [[ "$FORCE" != 1 ]]; then
-        ok "openEMS already built at $OPENEMS_DIR (./gems.sh openems rebuilds it)"
+        missing="$(openems_missing_libs)"
+        if [[ -n "$missing" ]]; then
+            warn "openEMS at $OPENEMS_DIR needs libraries that are no longer installed: $missing"
+            warn "(a system upgrade replaced them) - rebuilding openEMS against the current ones."
+            build_openems
+            rebuilt=1
+        else
+            ok "openEMS already built at $OPENEMS_DIR (./gems.sh openems rebuilds it)"
+        fi
     else
         build_openems
+        rebuilt=1
     fi
-    if [[ "$FORCE" == 1 ]] || ! "$VENV_PY" -c 'import CSXCAD, openEMS' >/dev/null 2>&1; then
+    # The bindings link against the openEMS libraries, so they are rebuilt whenever openEMS is.
+    if [[ "$FORCE" == 1 || "$rebuilt" == 1 ]] || ! "$VENV_PY" -c 'import CSXCAD, openEMS' >/dev/null 2>&1; then
         install_openems_bindings
     else
         ok "CSXCAD and openEMS bindings already in the venv"
