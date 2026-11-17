@@ -7,6 +7,7 @@ from __future__ import annotations
 import multiprocessing
 import os
 import threading
+import time
 from concurrent.futures import Future, ProcessPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from typing import Any, Callable, Optional
@@ -19,6 +20,23 @@ _disabled = False
 def workers() -> int:
     """Leave one core for the UI and the solver's own bookkeeping."""
     return max(1, min(4, (os.cpu_count() or 2) - 1))
+
+
+def _exit_with_parent(parent: int) -> None:
+    """Worker initializer: end this worker once the app process is gone.
+
+    Spawned workers hold both ends of the executor's call queue, so they never see EOF when the app
+    dies without a clean shutdown (a crash, os._exit) and would otherwise linger forever. Linux
+    re-parents an orphan, which is what this watches for; on Windows getppid() keeps the old id, so
+    there it never fires.
+    """
+
+    def watch() -> None:
+        while os.getppid() == parent:
+            time.sleep(2.0)
+        os._exit(0)
+
+    threading.Thread(target=watch, name="parent-watch", daemon=True).start()
 
 
 def _warm() -> int:
@@ -34,7 +52,8 @@ def _executor() -> Optional[ProcessPoolExecutor]:
         if _pool is None and not _disabled:
             try:
                 # spawn everywhere: forking the multi-threaded Qt process (Linux's default) can deadlock.
-                _pool = ProcessPoolExecutor(max_workers=workers(), mp_context=multiprocessing.get_context("spawn"))
+                _pool = ProcessPoolExecutor(max_workers=workers(), mp_context=multiprocessing.get_context("spawn"),
+                                            initializer=_exit_with_parent, initargs=(os.getpid(),))
             except Exception:  # noqa: BLE001 - no processes available: run inline from now on
                 _disabled = True
         return _pool

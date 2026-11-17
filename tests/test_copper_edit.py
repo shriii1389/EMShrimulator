@@ -4,6 +4,7 @@ Run with `.venv/bin/python tests/test_copper_edit.py`; the exit code is the verd
 """
 import math
 import os
+import sys
 import tempfile
 import time
 import traceback
@@ -434,6 +435,9 @@ def main():
     print(f"\n{len(results) - failed}/{len(results)} passed")
     from EMShrimulator.core import procpool
     procpool.shutdown()
+    # os._exit skips flushing, and stdout is block-buffered when it is a file or pipe (gems.sh test > log, CI).
+    sys.stdout.flush()
+    sys.stderr.flush()
     os._exit(1 if failed else 0)
 
 
