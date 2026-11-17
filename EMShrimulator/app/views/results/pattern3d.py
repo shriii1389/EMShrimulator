@@ -123,10 +123,10 @@ class Pattern3D(QWidget):
         self._bar.SetWidth(0.08)
         self._bar.SetHeight(0.8)
         self._bar.UnconstrainedFontSizeOn()
-        self._renderer.AddActor2D(self._bar)
+        self._renderer.AddViewProp(self._bar)
         self._title = vtkTextActor()
         self._title.SetPosition(12, 10)
-        self._renderer.AddActor2D(self._title)
+        self._renderer.AddViewProp(self._title)
         self._actors = []
         self._framing = None
 

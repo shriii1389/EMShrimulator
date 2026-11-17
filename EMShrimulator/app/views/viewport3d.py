@@ -13,8 +13,8 @@ from PySide6.QtCore import QPoint, QSettings, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QActionGroup, QCursor, QKeySequence
 from PySide6.QtWidgets import QHBoxLayout, QMenu, QToolButton, QVBoxLayout, QWidget
 from vtkmodules.qt.QVTKRenderWindowInteractor import QVTKRenderWindowInteractor
-from vtkmodules.util.numpy_support import ID_TYPE_CODE, numpy_to_vtk, numpy_to_vtkIdTypeArray
-from vtkmodules.util.vtkConstants import VTK_UNSIGNED_CHAR
+from vtkmodules.util.numpy_support import get_numpy_array_type, numpy_to_vtk, numpy_to_vtkIdTypeArray
+from vtkmodules.util.vtkConstants import VTK_ID_TYPE, VTK_UNSIGNED_CHAR
 from vtkmodules.vtkCommonCore import vtkPoints
 from vtkmodules.vtkCommonDataModel import vtkCellArray, vtkPolyData
 from vtkmodules.vtkFiltersCore import vtkFeatureEdges
@@ -97,8 +97,13 @@ class _Entry:
 
 # ------------------------------------------------------------------ polydata
 
+# numpy dtype of vtkIdType (int64 on 64-bit builds). Looked up rather than imported as
+# numpy_support.ID_TYPE_CODE, which VTK 9.7 removed.
+ID_DTYPE = np.dtype(get_numpy_array_type(VTK_ID_TYPE))
+
+
 def _ids(values: np.ndarray):
-    return numpy_to_vtkIdTypeArray(np.ascontiguousarray(values, dtype=ID_TYPE_CODE), deep=True)
+    return numpy_to_vtkIdTypeArray(np.ascontiguousarray(values, dtype=ID_DTYPE), deep=True)
 
 
 def _points(vertices: np.ndarray) -> vtkPoints:
@@ -561,7 +566,7 @@ class Viewport3D(QWidget):
         actor.SetMapper(mapper)
         actor.PickableOff()
         actor.SetVisibility(False)
-        self._front.AddActor2D(actor)
+        self._front.AddViewProp(actor)
         return actor
 
     def _axes_marker(self) -> vtkOrientationMarkerWidget:
@@ -861,7 +866,7 @@ class Viewport3D(QWidget):
                     self._renderer.AddActor(actor)
             for actor in arrow:
                 self._front.AddActor(actor)
-            self._renderer.AddActor2D(label)
+            self._renderer.AddViewProp(label)
             entry = _Entry("port", port_id, surface, edges, None, signature, color, 0.0 if awaiting else 0.28,
                            label=label, loops=arrow)
             self._entries[key] = entry
@@ -1028,7 +1033,7 @@ class Viewport3D(QWidget):
             self._renderer.RemoveActor(actor)
             self._front.RemoveActor(actor)
         if entry.label is not None:
-            self._renderer.RemoveActor2D(entry.label)
+            self._renderer.RemoveViewProp(entry.label)
 
     def _fit_bounds(self) -> Tuple[float, float, float, float, float, float]:
         if self._scene is not None and self._scene.bounds is not None:
@@ -1149,7 +1154,7 @@ class Viewport3D(QWidget):
         prompt.GetTextProperty().BoldOn()
         prompt.GetTextProperty().SetVerticalJustificationToTop()  # the readout lines hang below
         prompt.GetTextProperty().SetColor(*_rgb(c["text"]))
-        self._renderer.AddActor2D(prompt)
+        self._renderer.AddViewProp(prompt)
         self._pick = _PickRun(tool, units or Units(), extras, extras_owner, band, prompt)
         self._pool = None
         self._vtk.setCursor(Qt.CrossCursor)
@@ -1161,9 +1166,9 @@ class Viewport3D(QWidget):
         if run is None:
             return
         self._front.RemoveActor(run.band)
-        self._renderer.RemoveActor2D(run.prompt)
+        self._renderer.RemoveViewProp(run.prompt)
         for label in run.labels:
-            self._front.RemoveActor2D(label)
+            self._front.RemoveViewProp(label)
         self._vtk.unsetCursor()
         self._pool = None
         self.pickEnded.emit(run.tool)
@@ -1382,7 +1387,7 @@ class Viewport3D(QWidget):
             text.SetFontSize(14)
             text.BoldOn()
             text.ShadowOn()
-            self._front.AddActor2D(actor)
+            self._front.AddViewProp(actor)
             run.labels.append(actor)
         for index, actor in enumerate(run.labels):
             shown = index < len(labels)
@@ -1503,7 +1508,7 @@ class Viewport3D(QWidget):
         prop.ShadowOn()
         actor.PickableOff()
         actor.SetVisibility(False)
-        self._front.AddActor2D(actor)
+        self._front.AddViewProp(actor)
         return actor
 
     def _triad_label(self, style: str, text: str, origin: np.ndarray, c: Dict[str, str]) -> None:
