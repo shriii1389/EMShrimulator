@@ -1,0 +1,33 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pure-Python test dependencies
+        run: python -m pip install "pydantic>=2.13" numpy pytest
+      - name: Check the Linux launcher
+        if: runner.os == 'Linux'
+        run: bash -n gems.sh
+      - name: Compile Python sources
+        run: python -m compileall -q EMShrimulator tests tools
+      - name: Run pure-Python tests
+        env:
+          GEMS_PROJECTS_DIR: ${{ runner.temp }}/projects
+        run: python -m pytest -q tests/test_project_archive.py
+      - name: Run the Touchstone and results checks
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: python tests/test_touchstone.py
